@@ -1,25 +1,71 @@
-# IETC — Todo List (Electron + Angular)
+# Todo List — V1 Electron + Vanilla JS
 
-> Exercice réalisé dans le cadre du cours **"Projet de développement SGBD - Groupe 1"**  
-> Professeur : **N. Wattiaux** — École **IETC**  
-> Bachelier en Informatique — 2ème année
+> Branch `v1-vanilla` — [Back to main](../../tree/main)
 
 ---
 
-## Contexte
+## Stack
 
-Dans le cadre du cours du vendredi 10/04 (asynchrone), il nous a été demandé de :
-
-1. **Terminer l'exercice "To Do List"** commencé en classe lors du dernier cours.
-2. **Remplacer le frontend** par une version en **Angular avec TypeScript**.
+- [Electron](https://www.electronjs.org/) — desktop framework
+- HTML / CSS / JavaScript Vanilla — frontend
+- Node.js `fs` — JSON file persistence
 
 ---
 
-## Branches
+## Getting started
 
-| Branche | Description |
-|---|---|
-| [`v1-vanilla`](../../tree/v1-vanilla) | Todo List — Electron + HTML/CSS/JS Vanilla |
-| [`v2-angular`](../../tree/v2-angular) | Todo List — Electron + Angular + TypeScript |
+```bash
+npm install
+npm start
+```
 
-> Les détails de chaque version (installation, architecture, fonctionnalités) se trouvent dans le README de la branche correspondante.
+---
+
+## Features
+
+- Add a task (button or `Enter` key)
+- Toggle a task as done / undone
+- Delete a task
+- Data persisted locally in a JSON file (`userData/todo.json`)
+
+---
+
+## Architecture
+
+The app follows Electron's 3-layer architecture:
+
+```
+src/
+├── main/                            # Main process (Node.js)
+│   ├── index.js                     # Entry point — creates the BrowserWindow
+│   ├── handlers/
+│   │   └── todo.handler.js          # IPC listeners (ipcMain.handle)
+│   └── services/
+│       ├── todo.service.js          # CRUD business logic
+│       └── json.service.js          # Read / write JSON file
+│
+├── preload/                         # Bridge (secure context)
+│   ├── index.js                     # Exposes API via contextBridge
+│   └── apis/
+│       └── todo.api.js              # IPC calls (ipcRenderer.invoke)
+│
+└── renderer/                        # Renderer process (browser)
+    ├── index.html                   # HTML entry point
+    ├── main.js                      # Component bootstrap
+    └── components/todo/
+        ├── todo.component.js        # Events & rendering logic
+        ├── todo.template.js         # HTML template functions
+        └── todo.style.css           # Styles (dark theme)
+```
+
+---
+
+## Data flow
+
+```
+Renderer (UI)
+  → preload/todo.api       (ipcRenderer.invoke)
+    → main/todo.handler    (ipcMain.handle)
+      → main/todo.service  (business logic)
+        → main/json.service  (local JSON file)
+```

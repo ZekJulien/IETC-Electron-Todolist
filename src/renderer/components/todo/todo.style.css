@@ -1,0 +1,145 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 60px;
+}
+
+.todo-container {
+    width: 480px;
+}
+
+.todo-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 24px;
+    color: #cba6f7;
+    text-align: center;
+}
+
+.todo-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.todo-form input {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #45475a;
+    background: #313244;
+    color: #cdd6f4;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.todo-form input:focus {
+    border-color: #cba6f7;
+}
+
+.todo-form button {
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: none;
+    background: #cba6f7;
+    color: #1e1e2e;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.todo-form button:hover {
+    background: #b4befe;
+}
+
+.todo-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.todo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #313244;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid #45475a;
+    transition: border-color 0.2s;
+}
+
+.todo-item:hover {
+    border-color: #cba6f7;
+}
+
+.todo-text {
+    font-size: 0.95rem;
+}
+
+.todo-item--done .todo-text {
+    text-decoration: line-through;
+    color: #585b70;
+}
+
+.todo-check-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #45475a;
+    background: transparent;
+    color: #a6e3a1;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.todo-check-btn:hover {
+    border-color: #a6e3a1;
+}
+
+.todo-check-btn.checked {
+    background: #a6e3a1;
+    border-color: #a6e3a1;
+    color: #1e1e2e;
+}
+
+.todo-delete-btn {
+    background: transparent;
+    border: none;
+    color: #f38ba8;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.todo-delete-btn:hover {
+    background: #45475a;
+}
+
+.todo-empty {
+    text-align: center;
+    color: #585b70;
+    font-style: italic;
+    padding: 20px 0;
+}
