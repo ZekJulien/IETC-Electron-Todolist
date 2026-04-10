@@ -24,8 +24,10 @@ class TodoService{
     }
 
     add(title){
-        this._todos.push({'id': this.getIndex(), 'title': title, 'todo': false});
+        let newTodo = {'id': this.getIndex(), 'title': title, 'todo': false}
+        this._todos.push(newTodo);
         this.saveJSON();
+        return newTodo
     }
 
     toggle(id){

@@ -4,7 +4,8 @@
   "description": "",
   "main": "src/main/index.js",
   "scripts": {
-    "start": "electron .",
+    "build:renderer": "cd src/renderer && npx ng build --base-href ./",
+    "start": "npm run build:renderer && electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -1,0 +1,28 @@
+<div class="todo-container">
+    <h1 class="todo-title">Ma Todo List</h1>
+    <div class="todo-form">
+        <input
+            #todoInput
+            type="text"
+            placeholder="Nouvelle tâche..."
+            (keydown.enter)="add(todoInput.value); todoInput.value = ''"
+        />
+        <button (click)="add(todoInput.value); todoInput.value = ''">Ajouter</button>
+    </div>
+    <ul class="todo-list">
+        @for (item of todoList(); track item.id) {
+            <li class="todo-item" [class.todo-item--done]="item.todo">
+                <button
+                    class="todo-check-btn"
+                    [class.checked]="item.todo"
+                    (click)="toggle(item.id)">
+                    {{ item.todo ? '✓' : '' }}
+                </button>
+                <span class="todo-text">{{ item.title }}</span>
+                <button class="todo-delete-btn" (click)="delete(item.id)">✕</button>
+            </li>
+        } @empty {
+            <li class="todo-empty">Aucune tâche pour l'instant.</li>
+        }
+    </ul>
+</div>

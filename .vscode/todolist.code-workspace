@@ -1,0 +1,16 @@
+{
+    "folders": [
+        {
+            "name": "Electron",
+            "path": ".."
+        },
+        {
+            "name": "Shared",
+            "path": "../src/shared"
+        },
+        {
+            "name": "Angular",
+            "path": "../src/renderer"
+        }
+    ]
+}
