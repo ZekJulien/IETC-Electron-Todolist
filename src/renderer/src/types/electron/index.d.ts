@@ -1,9 +1,9 @@
-import { ITodoAPI } from "./todo";
+import { ITodoAPI } from '@shared/interfaces'
 
 declare global {
-    interface Window{
+    interface Window {
         todoService: ITodoAPI
     }
 }
 
-export{}
+export {}

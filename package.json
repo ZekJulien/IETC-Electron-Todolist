@@ -2,10 +2,12 @@
   "name": "ietc-electron-todolist",
   "version": "1.0.0",
   "description": "",
-  "main": "src/main/index.js",
+  "main": "dist/main/index.js",
   "scripts": {
+    "build:preload": "tsc -b src/preload && tsc-alias -p src/preload/tsconfig.json",
+    "build:main": "tsc -b src/main && tsc-alias -p src/main/tsconfig.json",
     "build:renderer": "cd src/renderer && npx ng build --base-href ./",
-    "start": "npm run build:renderer && electron .",
+    "start": "npm run build:preload && npm run build:main && npm run build:renderer && electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,6 +15,8 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^41.1.1"
+    "electron": "^41.1.1",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^6.0.2"
   }
 }

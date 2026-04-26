@@ -1,8 +1,12 @@
 {
     "folders": [
         {
-            "name": "Electron",
-            "path": ".."
+            "name": "Main",
+            "path": "../src/main"
+        },
+        {
+            "name": "Preload",
+            "path": "../src/preload"
         },
         {
             "name": "Shared",

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "outDir": "../../dist/preload",
+    "rootDir": ".",
+    "esModuleInterop": true,
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "references": [
+      { "path": "../shared" }
+    ]
+}
