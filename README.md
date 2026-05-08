@@ -18,10 +18,20 @@
 
 ```bash
 npm install
-npm run prisma:migrate
+npm run prisma:generate
 npm start
 ```
 
+> `npm install` recompile automatiquement `better-sqlite3` pour le Node d'Electron via `postinstall`.  
+> `prisma:generate` régénère le client TypeScript depuis le schéma.  
+> Les migrations sont appliquées automatiquement à la DB utilisateur au démarrage via `migrator.ts`.
+
+**Modifier le schéma ?** Après chaque modification de `prisma/schema/` :
+```bash
+npm run prisma:migrate
+```
+
+> `prisma:migrate` utilise `DATABASE_URL` défini dans `prisma.config.ts` (`file:./todo.db` par défaut). Pour personnaliser le chemin de la DB locale CLI, créer un `.env` depuis `.env.example` — cette DB n'est jamais utilisée par l'app, uniquement par la CLI Prisma.  
 > `npm install` déclenche automatiquement `postinstall` qui recompile `better-sqlite3` pour le Node embarqué par Electron.  
 > `prisma:migrate` génère le fichier SQL dans `prisma/migrations/` et régénère le client TypeScript — `prisma:generate` séparé est inutile.  
 > `npm start` bundle main et preload via Vite, build Angular, puis lance Electron.  
