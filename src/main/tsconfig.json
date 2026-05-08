@@ -4,15 +4,12 @@
     "target": "ES2022",
     "module": "node16",
     "moduleResolution": "node16",
-    "outDir": "../../dist/main",
-    "rootDir": ".",
+    "noEmit": true,
     "esModuleInterop": true,
     "paths": {
-      "@shared/*": ["../shared/*"]
+      "@shared/*": ["../shared/*"],
+      "@db/*":     ["../../prisma/generated/*"]
     }
   },
-  "include": ["**/*.ts"],
-  "references": [
-      { "path": "../shared" }
-    ]
+  "include": ["**/*.ts"]
 }

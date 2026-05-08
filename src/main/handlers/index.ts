@@ -1,10 +1,6 @@
-import { TodoService } from '../services/todo.service'
+import { AppDependencies } from '../dependencies'
 import { registerTodoHandlers } from './todo.handler'
 
-export interface AppServices {
-  todoService: TodoService
-}
-
-export function registerAllHandlers(services: AppServices): void {
-  registerTodoHandlers(services.todoService)
+export function registerAllHandlers(deps: AppDependencies): void {
+  registerTodoHandlers(deps.todoService)
 }

@@ -1,6 +1,6 @@
-# Todo List — V3 Full TypeScript
+# Todo List — V4 Prisma
 
-> Branche `v3-full-typescript` — [Retour au main](../../tree/main) — [V2 Angular](../../tree/v2-angular)
+> Branche `v4-prisma` — [Retour au main](../../tree/main) — [V3 Full TypeScript](../../tree/v3-full-typescript)
 
 ---
 
@@ -9,7 +9,8 @@
 - [Electron](https://www.electronjs.org/) — framework desktop
 - [Angular](https://angular.io/) + TypeScript — frontend
 - TypeScript intégral — main, preload, shared et renderer
-- Node.js `fs` — persistance JSON locale
+- [Vite](https://vitejs.dev/) — bundler pour main et preload (remplace `tsc -b`)
+- [Prisma ORM](https://www.prisma.io/) + SQLite — persistance (remplace `JsonService`)
 
 ---
 
@@ -17,10 +18,16 @@
 
 ```bash
 npm install
+npm run prisma:migrate
 npm start
 ```
 
-> `npm start` compile `shared`, `preload` et `main` via `tsc -b`, build Angular, puis lance Electron.
+> `npm install` déclenche automatiquement `postinstall` qui recompile `better-sqlite3` pour le Node embarqué par Electron.  
+> `prisma:migrate` génère le fichier SQL dans `prisma/migrations/` et régénère le client TypeScript — `prisma:generate` séparé est inutile.  
+> `npm start` bundle main et preload via Vite, build Angular, puis lance Electron.  
+> Les migrations sont appliquées automatiquement à la DB utilisateur au démarrage via `migrator.ts`.
+
+**Quand relancer `prisma:migrate` ?** Uniquement quand le schéma change. La DB locale `./todo.db` créée par le CLI n'est jamais utilisée par l'app — c'est un effet de bord inévitable de `prisma migrate dev`. L'app tourne toujours sur `app.getPath('userData')/todo.db`.
 
 ---
 
@@ -29,7 +36,7 @@ npm start
 - Ajouter une tâche (bouton ou touche `Entrée`)
 - Cocher / décocher une tâche comme terminée
 - Supprimer une tâche
-- Persistance des données dans un fichier JSON local (`userData/todo.json`)
+- Persistance des données dans une base SQLite via Prisma
 
 ---
 
@@ -38,39 +45,51 @@ npm start
 ```
 src/
 ├── main/                            # Processus principal (Node.js) — TypeScript
-│   ├── tsconfig.json                # Projet TS, cible CommonJS
 │   ├── index.ts                     # Point d'entrée Electron — lifecycle + window
-│   ├── bootstrap.ts                 # Composition root — instancie services, câble handlers
+│   ├── bootstrap.ts                 # Composition root — câble DI, retourne PrismaClient
+│   ├── core/
+│   │   └── db.ts                    # Infrastructure transversale — singleton PrismaClient, initDb() + getDb()
+│   ├── database/
+│   │   └── migrator.ts              # Migration runner — applique les migrations au démarrage
+│   ├── dependencies/
+│   │   ├── index.ts                          # buildDependencies() + AppDependencies
+│   │   ├── todo.repository.dependency.ts     # makeTodoRepository() — appelle getDb()
+│   │   └── todo.service.dependency.ts        # makeTodoService() — appelle makeTodoRepository()
 │   ├── handlers/
 │   │   ├── index.ts                 # Barrel — registerAllHandlers (fan-out IPC)
 │   │   └── todo.handler.ts          # Écouteurs IPC todo (ipcMain.handle)
+│   ├── repositories/
+│   │   ├── index.ts                 # Barrel
+│   │   └── todo.repository.ts       # Accès données — wrape Prisma, isole @prisma/client
 │   └── services/
-│       ├── index.ts                 # Barrel — exporte tous les services
-│       ├── todo.service.ts          # Logique métier CRUD (DI : reçoit JsonService)
-│       └── json.service.ts          # Lecture / écriture JSON générique
+│       ├── index.ts                 # Barrel
+│       └── todo.service.ts          # Logique métier CRUD — async, délègue au repository
 │
 ├── preload/                         # Pont sécurisé — TypeScript
-│   ├── tsconfig.json                # Projet TS, cible CommonJS, référence shared
 │   ├── index.ts                     # Exposition via contextBridge
 │   └── apis/
 │       └── todo.api.ts              # Appels IPC (ipcRenderer.invoke)
 │
 ├── shared/                          # Zone neutre Electron ↔ Angular — TypeScript
-│   ├── tsconfig.json                # Projet TS composite, émet des .d.ts
 │   ├── interfaces/
 │   │   ├── todo.interface.ts        # Modèle de données Todo
 │   │   └── todo-api.interface.ts    # Contrat IPC ITodoAPI — preload ↔ renderer
 │   └── channels/
 │       └── todo.channels.ts         # Constantes TODO_CHANNELS — preload ↔ main
 │
-└── renderer/                        # Projet Angular (frontend)
-    ├── src/app/                     # Composants, services Angular
-    └── dist/                        # Build Angular (non versionné)
+└── renderer/                        # Projet Angular (frontend) — inchangé
+    └── src/app/
 
-dist/                                # Sortie des projets TS composite (non versionné)
-├── shared/
-├── preload/
-└── main/
+prisma/
+├── schema/
+│   ├── base.prisma                  # Generator + datasource — config technique
+│   └── todo.prisma                  # Modèle Todo isolé
+├── migrations/                      # Historique SQL versionné — embarqué dans l'app
+└── generated/                       # Client TypeScript généré — ne pas éditer
+
+.vite/build/                         # Sortie Vite (non versionné)
+├── main.js                          # Main process bundlé (CJS)
+└── preload.js                       # Preload bundlé (CJS)
 ```
 
 ---
@@ -79,262 +98,186 @@ dist/                                # Sortie des projets TS composite (non vers
 
 ```
 Angular (UI)
-  → preload/todo.api       (ipcRenderer.invoke)
-    → main/todo.handler    (ipcMain.handle)
-      → main/todo.service  (logique métier)
-        → main/json.service  (fichier JSON local)
+  → preload/todo.api         (ipcRenderer.invoke)
+    → main/todo.handler      (ipcMain.handle)
+      → main/todo.service    (logique métier — async)
+        → main/todo.repository  (accès données — wrape Prisma)
+          → Prisma Client        (ORM)
+            → SQLite (todo.db)
 ```
 
 ---
 
 ## Réflexions & problèmes rencontrés
 
-### Pourquoi un tsconfig par sous-projet plutôt qu'un tsconfig unique à la racine ?
+### Pourquoi Vite remplace `tsc -b` pour main et preload
 
-En migrant main et preload en TypeScript, mon premier réflexe a été un seul `tsconfig.json` à la racine pour couvrir tout le repo. Vite écarté : chaque zone du projet a une **cible de compilation différente**. Le preload et le main tournent dans Node et ont besoin de `module: CommonJS`. Le renderer Angular bundle en ESNext via l'Angular CLI avec sa propre résolution. Shared n'émet que des déclarations. Mettre tout dans un seul tsconfig forcerait des compromis sur chaque option et des `overrides` partout.
+Prisma v7 a changé son générateur. L'ancien (`prisma-client-js`) produisait du CommonJS. Le nouveau (`prisma-client-ts`) génère du TypeScript ESM pur avec des `import.meta.url` — une syntaxe ESM qui n'existe pas en CJS.
 
-La structure retenue : un projet TS par sous-dossier, chacun avec son `tsconfig.json`, sa cible de module et son `outDir` — `src/main/`, `src/preload/` et `src/shared/` compilent indépendamment vers `dist/`, tandis que `src/renderer/` reste piloté par l'Angular CLI avec son propre tsconfig. Chaque zone a un contrat clair avec le compilateur, sans polluer les autres.
+`tsc -b` compile fichier par fichier. Il ne peut pas convertir `import.meta.url` en CJS. Vite est un **bundler** : il analyse toutes les dépendances, les inline dans un seul fichier, et traduit `import.meta.url` → `__dirname` pendant le bundle. C'est pour ça que Vite est nécessaire dès qu'on utilise Prisma v7.
 
----
-
-### Importer des types depuis `shared/` — l'erreur `TS6059` et pourquoi `import type` ne la résout pas
-
-Quand j'ai voulu importer `Todo` depuis `@shared/interfaces` dans le preload, tsc a refusé avec `TS6059: File '.../shared/interfaces/index.ts' is not under 'rootDir'`. La raison est simple : le `rootDir` du preload est `src/preload/`, et `shared/` est en dehors de ce scope.
-
-**Pourquoi `import type` n'aide pas** — mon premier réflexe a été d'utiliser `import type`, qui efface l'import à la compilation. Mais la vérification `rootDir` se fait au **chargement** du fichier pour le type-checking, **pas à l'émission**. tsc doit ouvrir `todo.interface.ts` pour comprendre ce qu'est `Todo`, et à ce moment-là il détecte que le fichier est hors scope — bien avant l'étape où l'import serait effacé. `import type` change ce qui est émis, pas ce qui est chargé.
-
-**Options envisagées :**
-
-- **Renommer shared en `.d.ts`** — les fichiers `.d.ts` échappent au check `rootDir` car ce sont des déclarations pures, jamais émises. Simple et cohérent avec "shared = types purs". Écarté parce que ça ne scale pas : dès que shared contiendra des **valeurs** runtime (constantes de canaux IPC, helpers partagés), il faudra rebasculer toute la structure. Autant poser la bonne fondation tout de suite.
-
-- **Élargir `rootDir` à `src/`** — l'erreur disparaît mais la sortie devient `dist/preload/preload/index.js` (dossier doublé, moche), et tsc émet des `.js` vides pour shared dans le dist du preload en doublon pour rien. Bancal.
-
-- **Project references avec `composite: true`** — la solution officielle TypeScript pour les repos multi-projets. Retenue.
+`tsc-alias` disparaît avec lui — Vite résout les alias `@shared/*` nativement via `resolve.alias`. Les `tsconfig.json` restent en place mais uniquement pour le **type-checking** (IDE, erreurs TypeScript) — ils ne pilotent plus le build.
 
 ---
 
-### Project references et `composite: true`
+### `emptyOutDir: false` — deux builds dans le même dossier
 
-Chaque projet TS référencé déclare `"composite": true`, émet ses `.d.ts`, et les projets consommateurs déclarent `"references": [{ "path": "../shared" }]`. tsc considère alors les fichiers de shared comme "gérés par un autre projet" — plus d'erreur `rootDir` dans le preload, même avec un import classique.
+Main et preload ont tous les deux `outDir: '.vite/build'`. Par défaut Vite vide l'`outDir` avant chaque build. Sans `emptyOutDir: false`, le build preload efface le `main.js` produit juste avant, et Electron ne trouve plus son point d'entrée.
 
-En pratique :
-- `src/shared/tsconfig.json` reçoit `"composite": true"`, `"declaration": true"`, `"declarationMap": true"` et émet vers `dist/shared/`. Le `declarationMap` permet aux "go to definition" depuis preload ou main de remonter à la source `.ts` de shared, pas au `.d.ts` compilé.
-- `src/preload/tsconfig.json` (et plus tard `src/main/tsconfig.json`) ajoutent `"references": [{ "path": "../shared" }]`.
-- La build passe de `tsc -p` à `tsc -b` (build mode) qui gère l'ordre de compilation et le cache incrémental via des fichiers `*.tsbuildinfo`.
-
-C'est le pattern utilisé par VS Code, Babel, et les gros monorepos TS. Ça peut sembler overkill pour une todolist, mais c'est la base saine pour tout repo TS multi-zone — et ça pose la bonne structure pour quand d'autres projets partagés s'ajouteront (helpers communs, validators, types d'événements, etc.).
+La solution : désactiver le nettoyage automatique sur les deux configs. Les deux fichiers cohabitent dans `.vite/build/` sans se supprimer.
 
 ---
 
-### `moduleResolution: "node"` déprécié — `Node16` vs `NodeNext`
+### Le chemin du preload change avec Vite
 
-TypeScript 6.0 a déprécié les anciennes valeurs `moduleResolution: "node"` / `"node10"` avec un warning qui rougit les tsconfig : *"will stop functioning in TypeScript 7.0"*. Il faut passer à une valeur moderne : **`Node16`**, **`NodeNext`** ou **`Bundler`**.
+Avec `tsc -b`, le main compilait dans `dist/main/` et le preload dans `dist/preload/`. Le chemin dans `index.ts` était donc `../preload/index.js`.
 
-`Bundler` est hors-jeu ici — c'est réservé aux codes qui passent par un bundler type webpack/esbuild/vite. Main, preload et shared tournent directement dans Node (celui d'Electron), sans bundler. Reste le choix entre `Node16` et `NodeNext`.
-
-**Point clé : quel Node doit-on cibler ?**
-
-Il y a deux Node en jeu, et c'est facile de se tromper :
-- Le Node de la machine qui exécute `tsc` (chez moi Node 25) — il n'exécute **jamais** le code compilé, il ne fait que compiler. Sa version n'a aucune importance pour le choix de `moduleResolution`.
-- Le Node **intégré à Electron** qui exécute les `.js` produits dans `dist/`. Electron 41 embarque Node 22.
-
-C'est **uniquement** le second qui compte pour le choix de `module` et `moduleResolution`.
-
-**Pourquoi `Node16` plutôt que `NodeNext` :**
-
-- `Node16` fixe un **plancher clair** — garantit du code qui tourne à partir de Node 16, donc largement couvert par le Node 22 d'Electron
-- `NodeNext` est une **cible mouvante** — suit la dernière version Node supportée par la version de TS installée. Peut émettre des constructions que des Node plus anciens ne comprennent pas, et son comportement peut changer entre releases de TS
-- Aucun gain pratique de `NodeNext` dans ce projet : toutes les features dont j'ai besoin sont supportées dès Node 16
-- Si un jour je rollback Electron vers une version plus ancienne, `Node16` tient, `NodeNext` potentiellement pas
-
-Config retenue dans `shared/`, `preload/` et (à venir) `main/` :
-
-```json
-"module": "Node16",
-"moduleResolution": "Node16"
+Avec Vite, les deux bundles atterrissent **au même niveau** dans `.vite/build/` :
+```
+.vite/build/
+├── main.js
+└── preload.js
 ```
 
-`module: "Node16"` émet automatiquement en **CommonJS ou ESM par fichier** selon le `"type"` de `package.json` (ici `"commonjs"`) ou l'extension (`.cts` forcé CJS, `.mts` forcé ESM). Donc concrètement mon JS émis reste du CommonJS, exactement comme avant, juste avec la résolution moderne qui supporte les `exports` de `package.json` et gère mieux l'interop.
+`__dirname` dans le bundle main vaut `.vite/build/`. Le chemin devient simplement `preload.js` — plus de remontée de dossier.
 
 ---
 
-### Le piège `paths` non réécrit au runtime
+### `/^node:/` en external — le piège du mode "client" Vite
 
-TypeScript résout les alias `paths` (`@shared/*`) à la compilation pour le type-checking, mais **ne les réécrit PAS** dans le JS émis. Si le preload contient `import { Todo } from '@shared/interfaces'`, le JS compilé contient littéralement `require('@shared/interfaces')` — ce que Node ne sait pas résoudre.
+Par défaut Vite build en environnement "client" (browser). Il détecte les imports `node:path`, `node:fs` et les externalise avec des stubs vides pour compatibilité browser. Résultat : `import path from 'node:path'` compile en `u.default.join(...)` où `u.default` est `undefined` — crash au démarrage.
 
-Tant que les imports depuis shared sont **uniquement des types** (effacés à la compilation via `import type`), aucun problème runtime : l'import disparaît avant que Node ne touche au code. C'est le cas actuellement pour `Todo`.
-
-Mais dès que shared contiendra des **valeurs** — typiquement les constantes de canaux IPC (`TODO_CHANNELS.GET_ALL` etc.) pour éviter les fautes de frappe silencieuses entre preload et handler main — le problème ressurgira avec un `Cannot find module '@shared/...'` au lancement de l'app.
-
-**Options envisagées :**
-- **`tsc-alias`** en post-build qui réécrit les alias en chemins relatifs dans le JS émis. **Retenu.**
-- **Imports relatifs** directs (`../../shared/...`) dans les zones runtime — moche et casse la cohérence avec Angular qui utilise l'alias.
-- **npm workspaces** transformant shared en vrai package `@app/shared` résolu comme un module Node — overkill pour le scope actuel.
-
-**Solution appliquée : `tsc-alias`.** Petit outil (~30 kB) qui ouvre les `.js` émis par tsc et **réécrit chaque alias en chemin relatif** depuis l'emplacement du fichier compilé :
-
-```js
-// Avant tsc-alias
-const channels_1 = require("@shared/channels");
-// Après tsc-alias
-const channels_1 = require("../../shared/channels");
-```
-
-Build chaîné dans `package.json` :
-```json
-"build:preload": "tsc -b src/preload && tsc-alias -p src/preload/tsconfig.json",
-"build:main":    "tsc -b src/main    && tsc-alias -p src/main/tsconfig.json"
-```
-
-Vérifié par recherche industrie (issue officielle TypeScript #55432, articles 2026) : `tsc-alias` est le **standard de facto** pour les projets Node + TS avec aliases. Aucun risque, ergonomie inchangée côté code (l'alias `@shared/*` reste partout, pas de mix avec des imports relatifs).
-
-Côté Angular : aucune modif nécessaire — webpack/esbuild résout déjà les alias automatiquement à la compilation.
+En ajoutant `/^node:/` à la liste des externals de rolldown, Vite laisse tous les imports `node:*` sous forme de `require('node:path')` dans le bundle. Electron/Node les résout correctement au runtime.
 
 ---
 
-### `as const` plutôt que `enum` pour les constantes partagées
+### DI manuelle inspirée FastAPI — `dependencies/` comme composition root distribuée
 
-Pour centraliser les canaux IPC dans `shared/` (pour que preload et main pointent sur les mêmes strings et que TypeScript rattrape toute faute de frappe), mon premier réflexe a été `enum`. Mais en creusant :
+En FastAPI, `Depends()` permet d'enchaîner les dépendances sans jamais passer manuellement l'objet DB :
 
-- Les `string enum` TS génèrent un objet **bidirectionnel** au runtime (inverse mapping) totalement inutile ici
-- Mauvaise tree-shakeability
-- L'équipe TypeScript elle-même déconseille les enums dans les projets modernes — c'est une construction antérieure aux unions littérales
-
-Implémenté avec `as const` dans `src/shared/channels/todo.channels.ts` — produit un objet runtime minimal et dérive un type union strict :
-
-```ts
-export const TODO_CHANNELS = {
-  GET_ALL: 'todo:getAll',
-  ADD:     'todo:add',
-  TOGGLE:  'todo:toggle',
-  DELETE:  'todo:delete',
-} as const
-
-export type TodoChannel = typeof TODO_CHANNELS[keyof typeof TODO_CHANNELS]
+```python
+def get_repo(db = Depends(get_db)): return TodoRepository(db)
+def get_service(repo = Depends(get_repo)): return TodoService(repo)
 ```
 
-Consommé identiquement des deux côtés :
+Le framework résout le graphe automatiquement. En TypeScript sans conteneur DI, ce mécanisme n'existe pas nativement — mais on peut s'en approcher avec le pattern `getDb()` + `dependencies/`.
 
-```ts
-// preload
-ipcRenderer.invoke(TODO_CHANNELS.GET_ALL)
+**La clé : confiner `getDb()` dans la couche `dependencies/`, pas dans les repositories.**
 
-// main
-ipcMain.handle(TODO_CHANNELS.GET_ALL, () => todoService.getAll())
+```
+core/db.ts                          → infrastructure transversale — singleton prisma, initDb() + getDb()
+dependencies/
+  todo.repository.dependency.ts     → makeTodoRepository() appelle getDb(), injecte dans le repo
+  todo.service.dependency.ts        → makeTodoService() appelle makeTodoRepository()
+  index.ts                          → buildDependencies() — graphe complet, sans prisma en paramètre
+repositories/
+  todo.repository.ts                → reçoit prisma par constructeur — ne connaît pas getDb()
+services/
+  todo.service.ts                   → reçoit le repo par constructeur — ne connaît pas prisma
 ```
 
-Résultat : un seul endroit pour les strings IPC, un type union strict consommable côté preload et main, aucun runtime parasite, et TS rattrape immédiatement toute incohérence de part et d'autre du pont IPC.
+`TodoRepository` reste pur et testable — il reçoit `prisma` par constructeur. C'est la couche `dependencies/` qui appelle `getDb()`, c'est son rôle. Les handlers ne voient que les services. Les services ne voient que les repos. Les repos ne voient que Prisma.
 
-C'est aussi le **premier import runtime** (et plus uniquement type) depuis shared — c'est donc à ce moment que le piège des `paths` non réécrits par tsc devient bloquant. Résolu par `tsc-alias` (cf. réflexion dédiée plus haut).
+**Pourquoi pas le Service Locator ?** Si le repo lui-même appelait `getDb()`, ses dépendances seraient cachées — on verrait un constructeur vide mais une dépendance implicite sur un état global. Ici `getDb()` est appelé dans `dependencies/` dont c'est explicitement le rôle de résoudre le graphe.
+
+**Le résultat** : `bootstrap.ts` fait `initDb(prisma)` puis `buildDependencies()` sans jamais threader `prisma` à travers chaque fonction. Ajouter une feature = créer `user.repository.dependency.ts`, ajouter une ligne dans `buildDependencies()`. `bootstrap.ts` ne grossit jamais.
 
 ---
 
-### Le contrat IPC `ITodoAPI` — source de vérité unique dans `shared/`
+### Le pattern Repository — Prisma reste dans sa couche
 
-En migrant le preload en TS, j'ai remarqué que la forme de l'API exposée à Angular était définie **deux fois** :
+`@prisma/client` n'est importé que dans `todo.repository.ts`. Les handlers IPC et `TodoService` ne voient jamais un type Prisma. `shared/Todo` est le DTO qui voyage sur le pont IPC — si demain on change d'ORM, seul le repository change, les handlers, services et le renderer restent intacts.
 
-- Côté **preload**, dans la déclaration de l'objet `todoService` exposé via `contextBridge`
-- Côté **renderer**, dans `src/renderer/src/types/electron/todo.d.ts` qui déclarait `interface ITodoAPI` pour typer `window.todoService`
-
-Les deux étaient alignées par chance. Mais **rien dans la structure n'imposait qu'elles le restent**. Si j'ajoutais une méthode (`setPriority`) ou changeais une signature (`add(title, priority)`) côté preload sans toucher au renderer, TypeScript ne disait rien — jusqu'au crash runtime, ou pire, jusqu'à un comportement silencieusement faux.
-
-C'est exactement le bug que le typage est censé empêcher : **quand un contrat est défini deux fois, ce n'est plus un contrat, c'est une coïncidence**.
-
-**Solution retenue : déplacer `ITodoAPI` dans `shared/interfaces/`** — la même zone neutre où vit déjà `Todo`. Les deux côtés réfèrent à la même source :
-
-```ts
-// shared/interfaces/todo-api.interface.ts — source de vérité
-export interface ITodoAPI {
-  getAll: () => Promise<Todo[]>
-  add: (title: string) => Promise<Todo>
-  toggle: (id: number) => Promise<void>
-  delete: (id: number) => Promise<void>
-}
-
-// preload/apis/todo.api.ts — implémentation typée par le contrat
-export const todoService: ITodoAPI = {
-  getAll: ()      => ipcRenderer.invoke('todo:getAll'),
-  add:    (title) => ipcRenderer.invoke('todo:add', title),
-  // ...
-}
-
-// renderer/types/electron/index.d.ts — déclaration globale typée par le contrat
-declare global { interface Window { todoService: ITodoAPI } }
-```
-
-Si je modifie `ITodoAPI` dans shared, **TypeScript rouge des deux côtés** tant que je n'ai pas mis à jour preload **et** renderer. Le contrat est désormais structurellement maintenu, plus accidentellement.
-
-**Cohérent avec la philosophie shared = DTO neutre** : `Todo` est la donnée transportée, `ITodoAPI` est le contrat du transport. Tous les deux appartiennent à la zone neutre — aucun ne devrait vivre uniquement d'un côté.
-
-**Pourquoi `I` devant le nom** : convention que j'ai gardée pour distinguer ce qui est un **contrat d'API** (préfixe `I`) des **modèles de données** (sans préfixe). `Todo` est un objet qu'on transporte ; `ITodoAPI` est une interface comportementale. La distinction sert à la lisibilité — voir `ITodoAPI` quelque part dit immédiatement « c'est un contrat de méthodes asynchrones », là où `Todo` dit « c'est de la donnée ».
+Un `PrismaService` wrapper avait été envisagé mais écarté : il n'ajoutait aucune logique, juste une couche supplémentaire. L'instance `PrismaClient` est créée directement dans `bootstrap.ts` (la composition root) et passée au repository par injection de dépendances. `bootstrap()` retourne l'instance pour que `index.ts` puisse appeler `$disconnect()` sur `before-quit`.
 
 ---
 
-### Composition root et DI manuelle — pas de module singleton
+### `moduleFormat = "cjs"` et `@prisma/client` en external — deux problèmes distincts
 
-Pour exposer un service au reste du main, le réflexe Node typique est `export const todoService = new TodoService()` au bas du fichier service. Simple, direct, et le module cache de Node garantit qu'il n'y a qu'une instance. C'est ce que faisait mon code en V2 (`module.exports = new TodoService()`).
+Deux erreurs successives, deux causes différentes.
 
-J'ai écarté ce pattern pour deux raisons :
+**Problème 1** : `import.meta.url` est `undefined` dans le bundle CJS. Prisma v7 génère du code ESM par défaut. Rolldown (le bundler de Vite 8) ne traduit pas `import.meta.url` en son équivalent CJS. Première tentative : `define: { 'import.meta.url': ... }` — évité car trop proche du sparadras. Vraie solution : `moduleFormat = "cjs"` dans le generator Prisma demande à Prisma de générer directement du CommonJS pour les fichiers TypeScript du client.
 
-- **Couplage caché** : les handlers importent directement le service. Pour savoir ce dont dépend `todo.handler`, il faut ouvrir le fichier et lire les imports. Multiplié par 10 features, l'arbre de dépendances de l'app n'est plus visible à un seul endroit.
-- **Non-testable** : impossible de remplacer `todoService` par un mock pour tester le handler sans monkey-patcher des modules.
+**Problème 2** : après `moduleFormat = "cjs"`, le WASM query compiler de Prisma (`query_compiler_fast_bg.sqlite.js`) utilise encore `import.meta.url` dans son propre loader — ce fichier vit dans `@prisma/client/runtime/`, pas dans le client généré. Solution : ajouter `/^@prisma\/client/` aux externals de Vite. Le runtime Prisma n'est plus bundlé — Node le charge dynamiquement depuis `node_modules` en contexte ESM natif où `import.meta.url` est correctement défini.
 
-**Solution retenue : DI manuelle avec composition root.**
-
-Chaque service reçoit ses dépendances par constructeur, chaque module de handlers reçoit son service par paramètre, et tout est câblé dans un seul fichier `bootstrap.ts` qui joue le rôle de **composition root** :
-
-```ts
-// bootstrap.ts
-export function bootstrap(): void {
-  const todoStore = new JsonService<Todo[]>(
-    path.join(app.getPath('userData'), 'todo.json')
-  )
-  const todoService = new TodoService(todoStore)
-
-  registerAllHandlers({ todoService })
-}
-```
-
-`main/index.ts` ne fait plus que le lifecycle Electron — il appelle `bootstrap()` et c'est tout. Quel que soit le nombre de features ajoutées, `index.ts` reste à ~15 lignes. Pour lire l'architecture du main, on lit `bootstrap.ts` et on a l'arbre complet en 10 lignes.
+Ces deux fixes sont complémentaires et distincts : l'un corrige les fichiers générés, l'autre corrige le runtime du package.
 
 ---
 
-### Pattern barrel pour les handlers — l'équivalent TypeScript de `__init__.py`
+### `better-sqlite3` et `@electron/rebuild` — modules natifs avec Electron
 
-Pour éviter que `bootstrap.ts` doive importer chaque `register*Handlers` individuellement (et grossir avec chaque feature), j'ai centralisé l'agrégation dans `handlers/index.ts` :
+`better-sqlite3` est un module natif : du C++ compilé en fichier `.node` pour une version spécifique de l'ABI Node.js. Electron embarque sa propre version de Node, différente de celle du système. Le `.node` compilé par `npm install` (pour le Node système) est incompatible avec le Node d'Electron — crash au démarrage.
 
-```ts
-// handlers/index.ts
-export interface AppServices {
-  todoService: TodoService
-  // userService: UserService    (futur)
-}
-
-export function registerAllHandlers(services: AppServices): void {
-  registerTodoHandlers(services.todoService)
-  // registerUserHandlers(services.userService)
-}
-```
-
-C'est l'analogue TypeScript du `__init__.py` Python : un fichier qui expose **une seule fonction de haut niveau** au reste du système. `bootstrap.ts` fait `registerAllHandlers({ todoService })` et n'a aucune visibilité sur les détails de chaque handler. Ajouter une feature devient un workflow prévisible :
-
-1. Créer `services/user.service.ts` (classe avec ses dépendances en constructeur)
-2. Créer `handlers/user.handler.ts` exportant `registerUserHandlers(userService)`
-3. Ajouter une ligne dans `handlers/index.ts` (un champ dans `AppServices`, un appel dans `registerAllHandlers`)
-4. Ajouter une ligne dans `bootstrap.ts` (instancier le service, l'inclure dans le câblage)
-
-Aucun fichier existant n'enfle — chaque ajout est local et explicite.
+`@electron/rebuild` recompile les modules natifs spécifiquement pour la version Node embarquée par Electron. C'est ce que Electron Forge fait automatiquement au démarrage — en faisant sans Electron Forge, on le gère manuellement avec `npx electron-rebuild -f -w better-sqlite3`. À ajouter comme script `postinstall` pour automatiser après chaque `npm install`.
 
 ---
 
-### Pourquoi pas un framework DI (tsyringe, InversifyJS) ?
+### Multi-file schema — un fichier par modèle Prisma
 
-Existent et fonctionnent. Mais à mon scope (un service, quatre handlers), ils sont overkill et introduisent une magie de décorateurs (`@injectable`, `@inject`) qui masque la simplicité du câblage manuel. La DI manuelle reste lisible jusqu'à ~10 services ; au-delà, un framework devient pertinent. À garder en tête pour quand le projet grossira — pas un besoin actuel.
+Par défaut `prisma init` génère un seul `schema.prisma` qui contient le generator, le datasource et tous les modèles. Pour un projet à un seul modèle c'est lisible. Dès qu'on dépasse 4-5 modèles, le fichier devient un enfer à naviguer.
 
-Note conceptuelle : Angular utilise un container DI parce que les composants sont instanciés **par le framework**, pas par le développeur — la seule façon de leur fournir des dépendances est de passer par le container. Dans le main process Electron, je contrôle moi-même le point d'entrée, donc je peux câbler à la main sans framework. Les deux approches sont valides dans leur contexte respectif.
+Prisma v7 supporte nativement les schemas multi-fichiers — il suffit de pointer `prisma.config.ts` vers un dossier plutôt qu'un fichier :
+
+```
+prisma/
+└── schema/
+    ├── base.prisma    ← generator + datasource uniquement
+    └── todo.prisma    ← model Todo isolé
+```
+
+`base.prisma` ne contient que la config technique (provider, output). Chaque modèle a son propre fichier. Demain on ajoute `user.prisma`, `tag.prisma` — chaque fichier est autonome, on ne touche pas aux autres.
+
+Le client généré atterrit dans `prisma/generated/` plutôt que dans `src/` — les outputs auto-générés n'ont pas leur place dans le code source écrit à la main. `src/` reste réservé au code qu'on écrit, `prisma/` regroupe tout l'écosystème Prisma : schema, migrations, client généré.
+
+---
+
+### Migrations au runtime — le problème des deux bases
+
+`prisma migrate dev` crée et applique les migrations sur un fichier DB local (`todo.db` à la racine du projet, chemin défini dans `.env`). Mais au runtime, l'app ouvre une DB dans `app.getPath('userData')` — un chemin différent, propre à chaque OS et chaque utilisateur. Ces deux fichiers sont distincts.
+
+Résultat : au premier lancement, la DB de l'utilisateur est vide, sans tables. Il faut appliquer les migrations au démarrage de l'app.
+
+**Prisma n'a pas d'API publique pour ça.** Citation de la discussion GitHub officielle : *"There is no programmatic interface to Prisma migrate — the only way to run prisma migrate deploy on app start is to fork a new process."* Les options :
+
+- **Raw SQL manuel** (`CREATE TABLE IF NOT EXISTS`) — simple mais on duplique ce que Prisma a déjà généré
+- **Lire et exécuter les fichiers SQL de migration** — le SQL vient de Prisma, on ne l'écrit pas à la main ← retenu
+- **Child process `prisma migrate deploy`** — correct mais nécessite les binaires Prisma en prod (~70 MB)
+
+**Solution retenue : `src/main/database/migrator.ts`**
+
+Au démarrage, le migrator lit les dossiers `prisma/migrations/` triés par nom (les noms sont des timestamps Prisma : `20260507204102_init` → ordre alphabétique = ordre chronologique), vérifie lesquels ont déjà été appliqués via une table `_prisma_migrations`, et exécute les SQL en attente.
+
+La table `_prisma_migrations` elle-même est créée avec du raw SQL — c'est inévitable : c'est une table de tracking qui doit exister avant toute migration, elle ne peut pas être dans le schéma Prisma. C'est d'ailleurs exactement ce que fait le Prisma CLI en interne. Tous les outils de migration (Alembic, Flyway, Liquibase) font pareil.
+
+Les fichiers de migration étant de petits fichiers texte inclus dans le package Electron, cette approche fonctionne aussi bien en dev qu'en production sans binaires supplémentaires.
+
+**Pourquoi `database/` et pas `utils/` ou `bootstrap.ts`**
+
+Ce code n'est ni de la logique métier (pas dans `services/`), ni de l'accès aux données du domaine (pas dans `repositories/`), ni du wiring (pas dans `bootstrap.ts`). C'est de l'infrastructure technique liée à la base de données. Un dossier `database/` regroupe ce type de préoccupations sans les mélanger avec le reste.
+
+---
+
+## Conclusion — Ce que cette branche apporte et ses limites
+
+### Ce qui est solide
+
+L'architecture est cohérente de bout en bout : chaque couche a une responsabilité unique, les dépendances vont toujours dans le bon sens, et ajouter une feature future est un workflow prévisible (un `.prisma`, un `.repository.ts`, un `.repository.dependency.ts`, un `.service.ts`, un `.service.dependency.ts`, une ligne dans `buildDependencies()`).
+
+La DI est réelle — les repositories et services sont testables de manière isolée, `bootstrap.ts` restera court pour toujours, et le pattern `core/db.ts` + `dependencies/` se rapproche autant que possible du `Depends()` de FastAPI sans conteneur DI.
+
+### Les limites honnêtes
+
+- **`electron-rebuild` manuel** — chaque clone du projet nécessite `npx electron-rebuild -f -w better-sqlite3`. Un script `postinstall` réglerait ça.
+- **Migration runner custom** — on a réimplémenté ce que Prisma ne fournit pas. Le code fonctionne mais un edge case (SQL avec `;` dans une string) pourrait poser problème sur des schémas plus complexes.
+- **Pas de hot reload** — chaque modification nécessite un `npm start` complet. Electron Forge ou `electron-vite` résout ça.
+- **`@prisma/client` en external** — contournement nécessaire pour éviter le problème WASM/`import.meta.url` avec rolldown. Fonctionne mais fragile si Prisma change son packaging.
+
+### Ce qui vient après — V5
+
+La v5 alignera le tooling avec l'écosystème réel : **Electron Forge + Vite** ou **electron-vite**. Ces outils gèrent automatiquement la recompilation des modules natifs, apportent le hot reload en dev, et produisent un binaire distributable propre. L'architecture construite ici (DI, repositories, dependencies, migrator) survit complètement à ce changement de build tool — c'est justement l'intérêt d'une séparation des couches bien faite.
 
 ---
 
 ## Partenaire de réflexion
 
-Ce projet a été développé avec l'aide de **Claude** (Anthropic) comme partenaire de réflexion sur les choix d'architecture — structure des dossiers, organisation des types TypeScript, intégration Electron/Angular. Les décisions finales restent les miennes, mais les échanges ont permis d'aller chercher les bonnes pratiques de l'industrie et de comprendre le pourquoi derrière chaque choix plutôt que de juste appliquer une recette.
+Ce projet a été développé avec l'aide de **Claude** (Anthropic) comme partenaire de réflexion sur les choix d'architecture. Les décisions finales restent les miennes, mais les échanges ont permis de comprendre le pourquoi derrière chaque choix plutôt que d'appliquer une recette.

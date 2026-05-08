@@ -11,12 +11,12 @@
     </div>
     <ul class="todo-list">
         @for (item of todoList(); track item.id) {
-            <li class="todo-item" [class.todo-item--done]="item.todo">
+            <li class="todo-item" [class.todo-item--done]="item.completed">
                 <button
                     class="todo-check-btn"
-                    [class.checked]="item.todo"
+                    [class.checked]="item.completed"
                     (click)="toggle(item.id)">
-                    {{ item.todo ? '✓' : '' }}
+                    {{ item.completed ? '✓' : '' }}
                 </button>
                 <span class="todo-text">{{ item.title }}</span>
                 <button class="todo-delete-btn" (click)="delete(item.id)">✕</button>

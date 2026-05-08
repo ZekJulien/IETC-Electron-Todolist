@@ -1,6 +1,14 @@
 {
     "folders": [
         {
+            "name": "Racine",
+            "path": "../"
+        },
+        {
+            "name": "Prisma",
+            "path": "../prisma"
+        },
+        {
             "name": "Main",
             "path": "../src/main"
         },
@@ -16,5 +24,14 @@
             "name": "Angular",
             "path": "../src/renderer"
         }
-    ]
+    ],
+    "settings": {
+        "files.exclude": {
+            "prisma": true,
+            "src": true,
+            ".vite":true,
+            ".vscode":true,
+            "node_modules":true
+        }
+    }
 }

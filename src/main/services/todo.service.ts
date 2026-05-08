@@ -1,42 +1,22 @@
 import { Todo } from '@shared/interfaces'
-import { JsonService } from './json.service'
+import { TodoRepository } from '../repositories'
 
 export class TodoService {
-  private _todos: Todo[]
+  constructor(private repo: TodoRepository) {}
 
-  constructor(private store: JsonService<Todo[]>) {
-    this._todos = store.readOrDefault([])
+  async getAll(): Promise<Todo[]> {
+    return this.repo.getAll()
   }
 
-  private nextId(): number {
-    return this._todos.length === 0
-      ? 1
-      : Math.max(...this._todos.map(t => t.id)) + 1
+  async add(title: string): Promise<Todo> {
+    return this.repo.add(title)
   }
 
-  private save(): void {
-    this.store.writeJson(this._todos)
+  async toggle(id: number): Promise<void> {
+    return this.repo.toggle(id)
   }
 
-  getAll(): Todo[] {
-    return this._todos
-  }
-
-  add(title: string): Todo {
-    const todo: Todo = { id: this.nextId(), title, todo: false }
-    this._todos.push(todo)
-    this.save()
-    return todo
-  }
-
-  toggle(id: number): void {
-    const todo = this._todos.find(t => t.id === id)
-    if (todo) todo.todo = !todo.todo
-    this.save()
-  }
-
-  delete(id: number): void {
-    this._todos = this._todos.filter(t => t.id !== id)
-    this.save()
+  async delete(id: number): Promise<void> {
+    return this.repo.delete(id)
   }
 }

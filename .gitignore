@@ -137,3 +137,13 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# SQLite — DB locale générée par prisma migrate dev (jamais utilisée par l'app)
+*.db
+*.db-journal
+
+# Vite build output
+.vite/
+
+# Prisma generated client
+/prisma/generated/

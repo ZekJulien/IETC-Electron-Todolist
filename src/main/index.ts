@@ -7,7 +7,7 @@ function createWindow(): void {
     width: 800,
     height: 600,
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -19,7 +19,11 @@ function createWindow(): void {
   )
 }
 
-app.whenReady().then(() => {
-  bootstrap()
+app.whenReady().then(async () => {
+  const prisma = await bootstrap()
   createWindow()
+
+  app.on('before-quit', async () => {
+    await prisma.$disconnect()
+  })
 })

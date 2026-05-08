@@ -37,7 +37,7 @@ export class TodoService {
     try {
       await window.todoService.toggle(id);
       this.todoList.update(todos =>
-        todos.map(t => t.id === id ? { ...t, todo: !t.todo } : t)
+        todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t)
       );
     } catch (error) {
       console.error('Impossible de modifier la tâche, l\'interface ne change pas', error);
