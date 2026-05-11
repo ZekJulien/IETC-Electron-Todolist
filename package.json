@@ -4,23 +4,33 @@
   "description": "",
   "main": ".vite/build/main.js",
   "scripts": {
-    "build:preload": "vite build --config vite.preload.config.ts",
-    "build:main": "vite build --config vite.main.config.ts",
-    "build:renderer": "cd src/renderer && npx ng build --base-href ./",
-    "start": "npm run build:main && npm run build:preload && npm run build:renderer && electron . --no-sandbox",
+    "start":           "electron-forge start",
+    "build:renderer":  "cd src/renderer && npx ng build --base-href ./",
+    "package":         "electron-forge package",
+    "make":            "electron-forge make",
     "prisma:generate": "npx prisma generate",
-    "prisma:migrate": "npx prisma migrate dev --name init",
-    "prisma:studio": "npx prisma studio",
-    "postinstall": "electron-rebuild -f -w better-sqlite3 && npm install --prefix src/renderer",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prisma:migrate":  "npx prisma migrate dev --name init",
+    "prisma:studio":   "npx prisma studio",
+    "postinstall":     "npm install --prefix src/renderer",
+    "test":            "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-rpm": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
+    "@electron-forge/plugin-fuses": "^7.11.1",
+    "@electron-forge/plugin-vite": "^7.11.1",
+    "@electron/fuses": "^1.8.0",
     "@electron/rebuild": "^4.0.4",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/electron-squirrel-startup": "^1.0.2",
     "dotenv": "^17.4.2",
     "electron": "^41.1.1",
     "prisma": "^7.8.0",
@@ -30,6 +40,7 @@
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "better-sqlite3": "^12.9.0"
+    "better-sqlite3": "^12.9.0",
+    "electron-squirrel-startup": "^1.0.1"
   }
 }

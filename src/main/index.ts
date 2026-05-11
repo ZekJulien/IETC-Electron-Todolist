@@ -1,6 +1,9 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
+import started from 'electron-squirrel-startup'
 import { bootstrap } from './bootstrap'
+
+if (started) app.quit()
 
 function createWindow(): void {
   const win = new BrowserWindow({
